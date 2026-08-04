@@ -1,0 +1,50 @@
+{
+  "_comment": "Fixture for `offboard.py --demo`. Represents the state of a departing engineer at the moment offboarding is initiated. Deliberately includes two things that survive account suspension: a non-SCIM app assignment (Zoom) and an API token the user created.",
+  "user": {
+    "id": "00u1a2b3c4D5E6F7G8H9",
+    "login": "jdoe@example.com",
+    "firstName": "Jamie",
+    "lastName": "Doe",
+    "status": "ACTIVE",
+    "role": "engineer",
+    "manager": "manager@example.com",
+    "admin_roles": []
+  },
+  "groups": [
+    { "id": "00g0000000000000001", "profile": { "name": "everyone" } },
+    { "id": "00g0000000000000002", "profile": { "name": "okta-mfa-required" } },
+    { "id": "00g0000000000000003", "profile": { "name": "eng-all" } },
+    { "id": "00g0000000000000004", "profile": { "name": "github-write" } },
+    { "id": "00g0000000000000005", "profile": { "name": "aws-dev" } },
+    { "id": "00g0000000000000006", "profile": { "name": "oncall-primary" } },
+    { "id": "00g0000000000000007", "profile": { "name": "datadog-users" } }
+  ],
+  "sessions": [
+    { "id": "1010000000000000001", "userAgent": "Chrome/macOS", "lastFactorVerification": "2026-08-15T09:12:00Z" },
+    { "id": "1010000000000000002", "userAgent": "Okta Verify/iOS", "lastFactorVerification": "2026-08-14T18:03:00Z" },
+    { "id": "1010000000000000003", "userAgent": "Slack Desktop/macOS", "lastFactorVerification": "2026-08-15T08:41:00Z" }
+  ],
+  "oauth_grants": [
+    { "id": "oag0000000000000001", "clientId": "0oa_slack", "scopes": ["okta.users.read", "offline_access"] },
+    { "id": "oag0000000000000002", "clientId": "0oa_github", "scopes": ["openid", "profile", "offline_access"] }
+  ],
+  "app_assignments": [
+    { "id": "0oa_google", "label": "Google Workspace", "scim": true },
+    { "id": "0oa_slack", "label": "Slack", "scim": true },
+    { "id": "0oa_github", "label": "GitHub", "scim": true },
+    { "id": "0oa_zoom", "label": "Zoom", "scim": false }
+  ],
+  "api_tokens": [
+    {
+      "id": "00T0000000000000001",
+      "name": "jenkins-integration",
+      "created": "2025-03-04T11:20:00Z",
+      "lastUpdated": "2026-08-01T02:00:00Z",
+      "createdBy": "00u1a2b3c4D5E6F7G8H9",
+      "status": "ACTIVE"
+    }
+  ],
+  "data_ownership": {
+    "google_drive": { "transfer_to": "manager@example.com", "automatable": true }
+  }
+}

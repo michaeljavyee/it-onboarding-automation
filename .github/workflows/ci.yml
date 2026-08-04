@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m pytest tests/ -q
+
+      - name: Demo mode must run with no credentials
+        # Exit 1 is the correct result: the fixture deliberately leaves two
+        # items requiring manual action. Anything else means the verification
+        # stage stopped catching them.
+        run: |
+          python src/offboard.py --demo && exit_code=0 || exit_code=$?
+          if [ "$exit_code" -ne 1 ]; then
+            echo "Expected exit 1 (manual items outstanding), got $exit_code"
+            exit 1
+          fi
+
+      - name: Safety rail must refuse an admin account
+        run: |
+          python src/offboard.py --demo --fixture leaver_admin.json && exit_code=0 || exit_code=$?
+          if [ "$exit_code" -ne 2 ]; then
+            echo "Expected exit 2 (refused), got $exit_code"
+            exit 1
+          fi

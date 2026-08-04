@@ -1,0 +1,28 @@
+{
+  "_comment": "Second demo fixture. Same shape as leaver_jdoe.json, but this account holds a Super Admin role. Used to demonstrate the safety rail: `offboard.py --demo --user admin@example.com` refuses to run without --i-know-this-is-an-admin.",
+  "user": {
+    "id": "00uADMIN0000000000AA",
+    "login": "admin@example.com",
+    "firstName": "Robin",
+    "lastName": "Vasquez",
+    "status": "ACTIVE",
+    "role": "engineer",
+    "manager": "ceo@example.com",
+    "admin_roles": ["SUPER_ADMIN", "ORG_ADMIN"]
+  },
+  "groups": [
+    { "id": "00g0000000000000001", "profile": { "name": "everyone" } },
+    { "id": "00g0000000000000003", "profile": { "name": "eng-all" } }
+  ],
+  "sessions": [
+    { "id": "1010000000000000009", "userAgent": "Chrome/macOS", "lastFactorVerification": "2026-08-15T09:00:00Z" }
+  ],
+  "oauth_grants": [],
+  "app_assignments": [
+    { "id": "0oa_google", "label": "Google Workspace", "scim": true }
+  ],
+  "api_tokens": [],
+  "data_ownership": {
+    "google_drive": { "transfer_to": "ceo@example.com", "automatable": true }
+  }
+}

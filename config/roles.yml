@@ -1,0 +1,75 @@
+# Machine-readable form of docs/role-access-matrix.md.
+# The document and this file are the same policy; the document explains it,
+# this file is what the tooling reads. If they disagree, the document is wrong.
+#
+# Company: Northwind Labs — fictional 50-person B2B SaaS startup.
+# See docs/role-access-matrix.md for the environment assumptions.
+
+metadata:
+  company: Northwind Labs
+  idp: Okta
+  hr_source_of_truth: BambooHR
+  reviewed: "2026-08-03"
+
+# Groups every employee gets regardless of role.
+baseline_groups:
+  - everyone
+  - okta-mfa-required
+
+roles:
+  engineer:
+    okta_groups: [eng-all, github-write, aws-dev]
+    apps:
+      google_workspace: { access: full, scim: true }
+      slack: { access: member, scim: true }
+      github: { access: write, scim: true }
+      aws: { access: "dev full, prod read-only", scim: false, note: "AWS SSO, manual permission-set assignment" }
+      zoom: { access: licensed, scim: false, note: "assigned by Okta app, not SCIM-provisioned" }
+    mdm_profile: eng-baseline
+    hardware: 'MacBook Pro 16"'
+    access_expiry: null
+
+  sales:
+    okta_groups: [sales-all, salesforce-users]
+    apps:
+      google_workspace: { access: full, scim: true }
+      slack: { access: member, scim: true }
+      salesforce: { access: standard, scim: true }
+      zoom: { access: licensed, scim: false }
+    mdm_profile: standard
+    hardware: 'MacBook Pro 14"'
+    access_expiry: null
+
+  finance:
+    okta_groups: [finance-all, netsuite-users, salesforce-readonly]
+    apps:
+      google_workspace: { access: full, scim: true }
+      slack: { access: member, scim: true }
+      salesforce: { access: read-only, scim: true }
+      netsuite: { access: standard, scim: true }
+      zoom: { access: licensed, scim: false }
+    mdm_profile: finance-hardened
+    hardware: 'MacBook Pro 14"'
+    access_expiry: null
+
+  contractor:
+    okta_groups: [contractors]
+    apps:
+      google_workspace: { access: "no external Drive sharing", scim: true }
+      slack: { access: single-channel-guest, scim: false, note: "guest accounts are not SCIM-managed" }
+      github: { access: read, scim: true, note: "time-boxed with the account" }
+    mdm_profile: contractor
+    hardware: BYOD
+    access_expiry:
+      days: 90
+      on_expiry: suspend
+      renewable: true
+      renewal_approver: sponsoring_manager
+
+# Apps that Okta cannot deprovision automatically. offboard.py reads this list
+# to decide what to put on the manual-action section of the report.
+non_scim_apps:
+  - zoom
+  - aws
+  - slack_guest_accounts
+  - datadog
