@@ -9,9 +9,12 @@ Everything in this repo is written against the interface, so `--demo` exercises
 exactly the same code paths as a live run. That matters: a demo mode that takes
 a different branch through the program proves nothing about the real branch.
 
-The HTTP layer is carried over from my earlier project, okta-nhi-audit-tool.
-The differences here are the write methods (suspend, revoke, unassign), which
-that project deliberately did not have — it was read-only by design.
+The HTTP layer follows the same patterns as my earlier project,
+okta-nhi-audit-tool (one reused Session, Link-header pagination), but it is a
+smaller implementation with one deliberate difference: on HTTP 429 it fails
+fast instead of retrying. That project only reads, so a retry is harmless.
+This one writes, and blindly replaying a write after a rate-limit response is
+how a half-finished offboarding gets applied twice.
 """
 
 from __future__ import annotations
@@ -33,7 +36,7 @@ class OktaInterface(Protocol):
 
     def get_user(self, login: str) -> dict[str, Any]: ...
     def list_groups(self, user_id: str) -> list[dict[str, Any]]: ...
-    def list_sessions(self, user_id: str) -> list[dict[str, Any]]: ...
+    def list_sessions(self, user_id: str, since: str | None = None) -> list[dict[str, Any]]: ...
     def list_oauth_grants(self, user_id: str) -> list[dict[str, Any]]: ...
     def list_app_assignments(self, user_id: str) -> list[dict[str, Any]]: ...
     def list_api_tokens_created_by(self, user_id: str) -> list[dict[str, Any]]: ...
@@ -81,16 +84,21 @@ class OktaClient:
             return None
         return response.json()
 
-    def _paginate(self, path: str) -> list[dict[str, Any]]:
-        """Okta pages via a Link header. Collect every page."""
+    def _paginate(self, path: str, params: dict[str, str] | None = None) -> list[dict[str, Any]]:
+        """Okta pages via a Link header. Collect every page.
+
+        `params` go on the first request only: the next-page URL Okta returns
+        already carries the full query, cursor included.
+        """
         results: list[dict[str, Any]] = []
         url = f"{self.org_url}{path}"
         while url:
-            response = self._session.get(url, timeout=30)
+            response = self._session.get(url, params=params, timeout=30)
             if not response.ok:
                 raise OktaError(f"GET {url} -> {response.status_code}")
             results.extend(response.json())
             url = response.links.get("next", {}).get("url", "")
+            params = None
         return results
 
     # --- reads -----------------------------------------------------------
@@ -105,13 +113,25 @@ class OktaClient:
     def list_groups(self, user_id: str) -> list[dict[str, Any]]:
         return self._paginate(f"/api/v1/users/{user_id}/groups")
 
-    def list_sessions(self, user_id: str) -> list[dict[str, Any]]:
-        # Okta exposes no "list sessions for user" endpoint. The closest signal
-        # is the system log. Documented honestly rather than faked.
-        return self._paginate(
-            f"/api/v1/logs?filter=actor.id+eq+%22{user_id}%22+and+"
-            "eventType+eq+%22user.session.start%22"
-        )
+    def list_sessions(self, user_id: str, since: str | None = None) -> list[dict[str, Any]]:
+        """Sign-in events for this user from the System Log.
+
+        Okta has no "list active sessions for a user" endpoint, so this returns
+        `user.session.start` events, not live sessions. Two consequences:
+
+          * Before revocation it is a count of *recent sign-ins* (default
+            window: Okta's, the last 7 days), not of sessions still open.
+          * Log events are permanent. Re-querying the same window after
+            revocation would always find the old sign-ins again, so the
+            verification pass passes `since=<revocation time>` and asks the
+            question that matters: has anyone signed in as this user since?
+        """
+        params = {
+            "filter": f'actor.id eq "{user_id}" and eventType eq "user.session.start"'
+        }
+        if since:
+            params["since"] = since
+        return self._paginate("/api/v1/logs", params=params)
 
     def list_oauth_grants(self, user_id: str) -> list[dict[str, Any]]:
         return self._paginate(f"/api/v1/users/{user_id}/grants")
@@ -173,8 +193,12 @@ class DemoOktaClient:
     def list_groups(self, user_id: str) -> list[dict[str, Any]]:
         return list(self.state["groups"])
 
-    def list_sessions(self, user_id: str) -> list[dict[str, Any]]:
-        return list(self.state["sessions"])
+    def list_sessions(self, user_id: str, since: str | None = None) -> list[dict[str, Any]]:
+        sessions = list(self.state["sessions"])
+        if since:
+            # Same semantics as the live client: only sign-ins at or after `since`.
+            sessions = [s for s in sessions if s.get("lastFactorVerification", "") >= since]
+        return sessions
 
     def list_oauth_grants(self, user_id: str) -> list[dict[str, Any]]:
         return list(self.state["oauth_grants"])

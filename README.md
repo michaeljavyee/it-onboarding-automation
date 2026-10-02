@@ -19,14 +19,14 @@ Initiated 2026-08-15 14:32 by michael@example.com
 
 ACTIONS
   ✅ Okta account suspended
-  ✅ 3 active sessions revoked
+  ✅ Sessions revoked (3 recent sign-ins)
   ✅ 2 OAuth refresh tokens revoked
   ✅ Removed from 7 groups
   ✅ Google Drive ownership → manager@example.com
 
 VERIFICATION (independent re-query)
   ✅ Authentication blocked
-  ✅ No active sessions
+  ✅ No sign-ins since sessions were revoked
   ✅ No valid refresh tokens
   ⚠️  Still assigned to: Zoom  (not SCIM-managed — manual removal required)
   🔴 API token "jenkins-integration" created by this user is STILL ACTIVE
@@ -196,9 +196,10 @@ An orphaned API token created by a departed employee is simultaneously an
 **offboarding failure** and a **non-human-identity finding**. `offboard.py`
 surfaces it at the moment of departure;
 [`okta-nhi-audit-tool`](https://github.com/michaeljavyee/okta-nhi-audit-tool) finds the
-ones that were already missed. `src/okta_client.py` reuses that project's HTTP
-and pagination layer directly — the difference here is the write methods, which
-that project deliberately did not have.
+ones that were already missed. `src/okta_client.py` follows that project's HTTP
+and pagination patterns; the differences are the write methods, which that
+project deliberately did not have, and failing fast on rate limits instead of
+retrying, because replaying a write is not harmless.
 
 ---
 
@@ -236,7 +237,7 @@ Deliberately not built yet — a coherent 40% beats a thin 90%:
 - [ ] Live-tenant Google Workspace adapter for Drive ownership transfer
 
 ```bash
-python -m pytest tests/ -q     # 14 passed
+python -m pytest tests/ -q     # 16 passed
 ```
 
 Nothing in this repo comes from any real employer. The company, the users, and

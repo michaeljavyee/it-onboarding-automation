@@ -98,7 +98,7 @@ Verification checks:
 | Check | Passes when |
 |---|---|
 | Account status | `SUSPENDED` or `DEPROVISIONED` |
-| Active sessions | none |
+| Sign-ins since sessions were revoked | none |
 | OAuth grants | none |
 | App assignments | none remaining, including non-SCIM apps |
 | API tokens created by this user | none in `ACTIVE` status |
@@ -126,8 +126,18 @@ whether offboarding is complete.
 ## Known limitation
 
 Okta has no "list active sessions for a user" endpoint. The live client
-approximates it from the System Log (`user.session.start` events), which is a
-weaker signal than a direct query — it can over-report sessions that ended
-naturally. The demo client models sessions directly. Stated here rather than
-papered over; a verification tool that lies about its own confidence is worse
-than no tool.
+reads `user.session.start` events from the System Log instead, which is a
+weaker signal than a direct query. Two things follow from that:
+
+- **Before revocation**, the count is of recent sign-ins, not of sessions still
+  open, and the report says so ("3 recent sign-ins").
+- **During verification**, the tool asks for sign-ins *after* the moment
+  sessions were revoked. An earlier version re-queried the same log window,
+  and because log events are permanent it would have reported the old sign-ins
+  as sessions "still active" on every live run. The demo fixture models
+  sessions directly, so the demo couldn't show that bug; a test now simulates
+  a log that keeps its history.
+
+The System Log can lag by a few seconds, so a sign-in in the instant before
+verification runs may not appear yet. Stated here rather than papered over; a
+verification tool that lies about its own confidence is worse than no tool.

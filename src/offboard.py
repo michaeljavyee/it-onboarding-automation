@@ -43,6 +43,11 @@ WARN = "⚠️ "
 CRIT = "\U0001f534"
 
 
+def utc_now_iso() -> str:
+    """Current time in the ISO 8601 form Okta's System Log `since` accepts."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
 def plural(items) -> str:
     return "" if len(items) == 1 else "s"
 
@@ -91,6 +96,9 @@ class OffboardRun:
         self.audit = audit
         self.is_demo = is_demo
         self.actions: list[str] = []
+        # When sessions were revoked (ISO 8601, UTC). Verification asks for
+        # sign-ins after this instant, not "any sign-ins ever".
+        self.sessions_revoked_at: str | None = None
         self.findings: list[tuple[str, str]] = []  # (severity, text)
 
     # --- step 1-7: act ---------------------------------------------------
@@ -111,9 +119,13 @@ class OffboardRun:
         groups = self.client.list_groups(self.user_id)
 
         self._do("Okta account suspended", lambda: self.client.suspend_user(self.user_id))
+        def revoke_sessions() -> None:
+            self.sessions_revoked_at = utc_now_iso()
+            self.client.clear_sessions(self.user_id)
+
         self._do(
-            f"{len(sessions)} active session{plural(sessions)} revoked",
-            lambda: self.client.clear_sessions(self.user_id),
+            f"Sessions revoked ({len(sessions)} recent sign-in{plural(sessions)})",
+            revoke_sessions,
         )
         self._do(
             f"{len(grants)} OAuth refresh token{plural(grants)} revoked",
@@ -153,11 +165,16 @@ class OffboardRun:
         else:
             self.findings.append(("crit", f"Account status is {user.get('status')} — NOT suspended"))
 
-        sessions = self.client.list_sessions(self.user_id)
+        # Not "are there any sign-ins?": the System Log keeps the ones from
+        # before revocation forever. The question is whether anyone has signed
+        # in since.
+        sessions = self.client.list_sessions(self.user_id, since=self.sessions_revoked_at)
         if sessions:
-            self.findings.append(("crit", f"{len(sessions)} session(s) still active"))
+            self.findings.append(
+                ("crit", f"{len(sessions)} sign-in(s) since sessions were revoked")
+            )
         else:
-            self.findings.append(("ok", "No active sessions"))
+            self.findings.append(("ok", "No sign-ins since sessions were revoked"))
 
         grants = self.client.list_oauth_grants(self.user_id)
         if grants:

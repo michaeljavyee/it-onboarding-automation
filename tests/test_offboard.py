@@ -92,3 +92,43 @@ def test_report_contains_the_headline_sections():
     assert "OFFBOARDING REPORT — jdoe@example.com" in report
     assert "VERIFICATION (independent re-query)" in report
     assert "Offboarding is NOT complete." in report
+
+
+class LogBackedDemoClient(DemoOktaClient):
+    """Behaves like the live client's System Log: clearing sessions does not
+    erase the sign-in events that already happened."""
+
+    def __init__(self, fixture="leaver_jdoe.json", sign_in_after_revocation=False):
+        super().__init__(fixture)
+        self.sign_in_after_revocation = sign_in_after_revocation
+
+    def clear_sessions(self, user_id):
+        if self.sign_in_after_revocation:
+            self.state["sessions"].append(
+                {"id": "late", "userAgent": "curl/8", "lastFactorVerification": "2099-01-01T00:00:00Z"}
+            )
+        # Historic events stay, exactly as in the real System Log.
+
+
+def _verified_run(client):
+    import safety
+
+    user = client.get_user("jdoe@example.com")
+    audit = safety.AuditLog(target=user["login"], mode="demo", enabled=False)
+    run = offboard.OffboardRun(client, user, writes_enabled=True, audit=audit, is_demo=True)
+    run.run_actions()
+    run.verify()
+    return run
+
+
+def test_historic_sign_ins_do_not_count_as_still_active():
+    """Regression: the log keeps pre-revocation sign-ins; verification must not
+    read them as live sessions."""
+    run = _verified_run(LogBackedDemoClient())
+    assert ("ok", "No sign-ins since sessions were revoked") in run.findings
+
+
+def test_sign_in_after_revocation_is_critical():
+    run = _verified_run(LogBackedDemoClient(sign_in_after_revocation=True))
+    critical = [text for severity, text in run.findings if severity == "crit"]
+    assert any("since sessions were revoked" in text for text in critical)
