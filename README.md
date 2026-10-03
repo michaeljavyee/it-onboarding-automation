@@ -192,6 +192,13 @@ Full versions in **[docs/decision-log.md](docs/decision-log.md)**.
 
 ## How this connects to my other work
 
+Three repos, one idea: **the system reported success and left something behind.**
+
+This repo is the one that says it out loud. Suspend the account, get `200`, close
+the ticket — and the API token that engineer created three years ago is still
+authenticating this morning. The verification pass exists because the success
+response is not the evidence.
+
 An orphaned API token created by a departed employee is simultaneously an
 **offboarding failure** and a **non-human-identity finding**. `offboard.py`
 surfaces it at the moment of departure;
@@ -200,6 +207,32 @@ ones that were already missed. `src/okta_client.py` follows that project's HTTP
 and pagination patterns; the differences are the write methods, which that
 project deliberately did not have, and failing fast on rate limits instead of
 retrying, because replaying a write is not harmless.
+
+```mermaid
+flowchart LR
+    subgraph Identity
+        A["it-onboarding-automation<br/>verify at the moment of change"]
+        B["okta-nhi-audit-tool<br/>find what was already missed"]
+        C["Workflows remediation<br/><i>not built yet</i>"]
+        A --> B
+        B -.-> C
+        C -.-> A
+    end
+    subgraph Network
+        D["meraki-config-auditor<br/>declared baseline vs live config"]
+    end
+    style C stroke-dasharray: 5 5
+```
+
+| Repo | Catches | The lie it doesn't believe |
+|---|---|---|
+| **it-onboarding-automation** (this repo) | Leaver actions that returned success but didn't take effect | "HTTP 200 means it happened" |
+| [okta-nhi-audit-tool](https://github.com/michaeljavyee/okta-nhi-audit-tool) | Machine identities no access review has ever covered | "We review access quarterly" |
+| [meraki-config-auditor](https://github.com/michaeljavyee/meraki-config-auditor) | Config drift between declared intent and live network state | "Dashboard shows the switch green" |
+
+**The honest gap:** the dotted arrow is Okta Workflows — take a finding, notify
+the owner, open a ticket, revoke after a grace period, so detection closes into
+action instead of ending in a report. Not built yet. It's the next thing.
 
 ---
 
